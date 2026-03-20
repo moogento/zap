@@ -1,0 +1,19 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "zap",
+  "metadata": {
+    "description": "Competitive multi-agent bug fixing"
+  },
+  "owner": {
+    "name": "Local",
+    "email": "local@local"
+  },
+  "plugins": [
+    {
+      "name": "zap",
+      "description": "Fix bugs using competitive multi-agent investigation with recon, parallel theories, validation, and retry",
+      "version": "1.0.0",
+      "source": "./"
+    }
+  ]
+}
