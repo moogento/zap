@@ -1,7 +1,7 @@
 ---
 name: zap
-description: Fix a bug using competitive multi-agent investigation. Recon agent surveys the codebase, 5 agents investigate different theories, top 3 implement fixes, validates with 3 testers, retries on partial failure, then commits and creates a PR. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
-argument-hint: "<bug description>"
+description: Fix a bug using competitive multi-agent investigation. 3 parallel recon agents survey the codebase, 5 agents investigate different theories, top 3 implement fixes, validates with 3 testers, retries on partial failure, then commits and creates a PR. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
+argument-hint: "<bug description> [--single-recon]"
 ---
 
 # Multi-Agent Bug Fix
@@ -10,7 +10,48 @@ Fix the following bug using competitive multi-agent investigation:
 
 **Bug:** $ARGUMENTS
 
-## Phase 0: Reconnaissance (1 agent, fast)
+## Phase 0: Reconnaissance
+
+If `$ARGUMENTS` contains `--single-recon`, use **single-agent recon** (below). Otherwise, use **parallel recon** (default).
+
+### Default: Parallel recon (3 agents, fast)
+
+Spawn **3 agents in parallel**, each in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`.
+
+Each agent has a distinct recon responsibility:
+
+**Agent 1 — Code reader:**
+- The bug description
+- Instructions to:
+  - Find and read source files likely related to the bug
+  - Map the relevant code paths, entry points, and data flow
+  - Identify suspicious patterns, error handling gaps, or logic issues
+  - Return a **structured report**: relevant files (with brief descriptions), code path analysis, suspicious areas
+- A **5-minute time budget** — breadth over depth
+
+**Agent 2 — Git archaeologist:**
+- The bug description
+- Instructions to:
+  - Run `git log` on files and directories likely related to the bug
+  - Run `git blame` on the most suspect sections
+  - Identify recent changes that could have introduced the bug
+  - Check commit messages and PR descriptions for related context
+  - Return a **structured report**: recent changes (commits, authors, dates, diffs), suspect commits, relevant history
+- A **5-minute time budget** — breadth over depth
+
+**Agent 3 — Test runner:**
+- The bug description
+- Instructions to:
+  - Identify and run existing tests related to the bug area
+  - Note which tests pass and which fail, with output
+  - Search for related TODOs, FIXMEs, HACKs, or known-issue comments
+  - Check for disabled/skipped tests that might be relevant
+  - Return a **structured report**: test results (pass/fail with output), related comments and TODOs, test coverage gaps
+- A **5-minute time budget** — breadth over depth
+
+Wait for all 3 agents to complete. Merge their reports into a single **recon report**: combine relevant files, recent changes, test results, and initial observations. Deduplicate and cross-reference findings. This becomes the shared artifact that every agent in every subsequent phase receives as baseline context.
+
+### Alternative: Single-agent recon (`--single-recon`)
 
 Spawn **1 agent** in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`.
 

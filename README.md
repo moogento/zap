@@ -12,7 +12,7 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 
 | Phase | What happens | Agents | Model |
 |-------|-------------|--------|-------|
-| **P0 Recon** | Survey codebase, git history, run tests | 1 | Sonnet |
+| **P0 Recon** | Survey codebase, git history, run tests | 3 (or 1) | Sonnet |
 | **P1 Investigate** | 5 different theories tested in parallel | 5 | Sonnet |
 | **P2 Deep dive** | Top 3 theories get full fix implementations | 3 | Opus |
 | **P3 Select** | Orchestrator picks the best fix | — | — |
@@ -28,6 +28,12 @@ Every agent runs in an isolated git worktree. No agent can break your working tr
 /zap <describe the bug>
 ```
 
+Options:
+
+| Flag | Effect |
+|------|--------|
+| `--single-recon` | Use 1 recon agent instead of 3 parallel (cheaper, slower) |
+
 Examples:
 
 ```
@@ -36,11 +42,13 @@ Examples:
 /zap race condition in WebSocket reconnect — messages dropped on fast network switches
 
 /zap build fails on CI but passes locally, something about asset paths
+
+/zap --single-recon off-by-one in pagination
 ```
 
 ## What Makes It Different
 
-**Recon before theories.** A dedicated agent reads the code and git history before anyone starts guessing. Theories are grounded in evidence, not vibes.
+**Parallel recon before theories.** Three specialized agents — code reader, git archaeologist, test runner — survey the codebase simultaneously before anyone starts guessing. Theories are grounded in evidence, not vibes.
 
 **Agents compete, not collaborate.** 5 independent theories, 3 independent fixes. No groupthink. The best fix wins on merit.
 
@@ -75,8 +83,8 @@ Then restart Claude Code. `/zap` will be available in all projects.
 ## Cost
 
 A full run spawns ~15 agents across all phases. Expect roughly:
-- **Typical run:** ~12 agents (recon + 5 investigate + 3 fix + 3 test)
-- **With retry:** ~17 agents (add 2 fix + 2–3 retest)
+- **Typical run:** ~14 agents (3 recon + 5 investigate + 3 fix + 3 test)
+- **With retry:** ~19 agents (add 2 fix + 2–3 retest)
 - **Model mix:** Sonnet for investigation/testing, Opus for fix implementation
 
 Use it for bugs that justify the investment.
