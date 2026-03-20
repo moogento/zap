@@ -1,0 +1,5 @@
+{
+  "name": "zap",
+  "description": "Competitive multi-agent bug fixing",
+  "skills": "./.claude/skills"
+}
