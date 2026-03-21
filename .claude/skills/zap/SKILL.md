@@ -151,12 +151,8 @@ Wait for all 3.
 ### 2/3 or 3/3 testers pass → Ship it
 
 1. Commit the fix on the feature branch with a clear commit message
-2. Push the branch
-3. Create a PR to main using `gh pr create` with:
-   - Title: concise bug fix description
-   - Body: Summary of the bug, root cause found, fix applied, and validation results
 
-Report the PR URL to the user.
+Report the branch name to the user. Remind them they can use `/zap-cleanup` to merge and clean up.
 
 ### 1/3 testers pass → Competitive retry
 

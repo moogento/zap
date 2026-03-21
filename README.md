@@ -2,7 +2,7 @@
 
 # zap
 
-A Claude Code plugin that fixes bugs using competitive multi-agent investigation. When a bug resists your first few attempts, zap throws a squad of agents at it — recon, parallel theories, competing fixes, independent validation — and ships a PR.
+A Claude Code plugin that fixes bugs using competitive multi-agent investigation. When a bug resists your first few attempts, zap throws a squad of agents at it — recon, parallel theories, competing fixes, independent validation — and commits a fix.
 
 ## How It Works
 
@@ -18,7 +18,7 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 | **P3 Select** | Orchestrator picks the best fix | — | — |
 | **P4 Apply** | Winner applied to a feature branch | — | — |
 | **P5 Validate** | 3 testers check functional, regression, quality | 3 | Sonnet |
-| **P6 Ship/Retry** | PR on pass, competitive retry on partial fail | 0–2 | Opus |
+| **P6 Ship/Retry** | Commit on pass, competitive retry on partial fail | 0–2 | Opus |
 
 Every agent runs in an isolated git worktree. No agent can break your working tree.
 
@@ -27,6 +27,14 @@ Every agent runs in an isolated git worktree. No agent can break your working tr
 ```
 /zap <describe the bug>
 ```
+
+After the fix is committed on a feature branch, use `/zap-cleanup` to merge and clean up:
+
+```
+/zap-cleanup [branch-name]
+```
+
+This merges the fix branch to main, removes agent worktrees, and deletes temporary branches.
 
 Options:
 
