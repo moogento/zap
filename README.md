@@ -8,7 +8,7 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 
 ![zap investigation flow](assets/flow.png)
 
-**7 phases, fully autonomous:**
+**8 phases, fully autonomous:**
 
 | Phase | What happens | Agents | Model |
 |-------|-------------|--------|-------|
@@ -18,7 +18,8 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 | **P3 Select** | Orchestrator picks the best fix | — | — |
 | **P4 Apply** | Winner applied to a feature branch | — | — |
 | **P5 Validate** | 3 testers check functional, regression, quality | 3 | Sonnet |
-| **P6 Ship/Retry** | Commit on pass, competitive retry on partial fail | 0–2 | Opus |
+| **P6 Ship/Retry** | Quality gates (security + cleanup), commit, push, create PR; competitive retry on partial fail | 0–4 | Sonnet/Opus |
+| **P7 PR Feedback** | Wait for review bots, evaluate and fix valid suggestions | — | — |
 
 Every agent runs in an isolated git worktree. No agent can break your working tree.
 
@@ -28,7 +29,7 @@ Every agent runs in an isolated git worktree. No agent can break your working tr
 /zap <describe the bug>
 ```
 
-After the fix is committed on a feature branch, use `/zap-cleanup` to merge and clean up:
+After the fix is committed, a PR is created, and automated review feedback is addressed. Use `/zap-cleanup` to merge and clean up:
 
 ```
 /zap-cleanup [branch-name]
@@ -41,6 +42,8 @@ Options:
 | Flag | Effect |
 |------|--------|
 | `--single-recon` | Use 1 recon agent instead of 3 parallel (cheaper, slower) |
+| `--no-security` | Skip the security review quality gate |
+| `--no-cleanup` | Skip code simplification & beautification quality gate |
 
 Examples:
 
@@ -66,6 +69,10 @@ Examples:
 
 **Retry is competitive.** If validation partially fails, 2 new agents compete to revise the fix using failure feedback. One more shot before giving up.
 
+**Quality gates before shipping.** After validation passes, a security reviewer scans for OWASP Top 10 vulnerabilities and a cleanup agent runs the project's linter/formatter and simplifies the code — all before the commit lands. Disable with `--no-security` or `--no-cleanup`.
+
+**PR feedback loop.** After the PR is created, zap waits 5 minutes for automated review bots to post comments, then evaluates each suggestion — implementing valid ones and rejecting incorrect ones with reasons.
+
 ## Install
 
 ```bash
@@ -90,9 +97,9 @@ Then restart Claude Code. `/zap` will be available in all projects.
 
 ## Cost
 
-A full run spawns ~15 agents across all phases. Expect roughly:
-- **Typical run:** ~14 agents (3 recon + 5 investigate + 3 fix + 3 test)
-- **With retry:** ~19 agents (add 2 fix + 2–3 retest)
+A full run spawns ~16–21 agents across all phases. Expect roughly:
+- **Typical run:** ~16 agents (3 recon + 5 investigate + 3 fix + 3 test + 2 quality gates) + PR feedback
+- **With retry:** ~21 agents (add 2 fix + 2–3 retest) + PR feedback
 - **Model mix:** Sonnet for investigation/testing, Opus for fix implementation
 
 Use it for bugs that justify the investment.

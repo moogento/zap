@@ -1,7 +1,7 @@
 ---
 name: zap
-description: Fix a bug using competitive multi-agent investigation. 3 parallel recon agents survey the codebase, 5 agents investigate different theories, top 3 implement fixes, validates with 3 testers, retries on partial failure, then commits and creates a PR. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
-argument-hint: "<bug description> [--single-recon]"
+description: Fix a bug using competitive multi-agent investigation. 3 parallel recon agents survey the codebase, 5 agents investigate different theories, top 3 implement fixes, validates with 3 testers, retries on partial failure, then commits, creates a PR, waits 5 minutes for automated review feedback, and addresses valid suggestions. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
+argument-hint: "<bug description> [--single-recon] [--no-security] [--no-cleanup]"
 ---
 
 # Multi-Agent Bug Fix
@@ -9,6 +9,15 @@ argument-hint: "<bug description> [--single-recon]"
 Fix the following bug using competitive multi-agent investigation:
 
 **Bug:** $ARGUMENTS
+
+## Argument Parsing
+
+Parse `$ARGUMENTS` to extract:
+1. **Bug description**: Everything except flags
+2. **Flags**:
+   - `--single-recon`: Use single-agent recon instead of parallel (see Phase 0)
+   - `--no-security`: Skip security review in quality gates (Phase 6)
+   - `--no-cleanup`: Skip code simplification & beautification in quality gates (Phase 6)
 
 ## Phase 0: Reconnaissance
 
@@ -148,11 +157,53 @@ Wait for all 3.
 
 ## Phase 6: Retry or ship
 
-### 2/3 or 3/3 testers pass → Ship it
+### 2/3 or 3/3 testers pass → Quality gates & ship
+
+Run quality gates on the feature branch before committing, then ship.
+
+#### Quality gates
+
+Run these **sequentially** on the feature branch (both modify files, so no parallel execution). Each agent works directly on the feature branch — no worktree isolation needed.
+
+**Security Review & Fix** (skip if `--no-security`):
+
+Spawn 1 agent. Use `model: "sonnet"`.
+
+The agent gets:
+- The bug description
+- The output of `git diff main` showing all changes on the feature branch
+- Instructions to:
+  - Review all changed code for security vulnerabilities
+  - Check OWASP Top 10: injection (SQL, command, code), XSS, insecure deserialization, broken access control, sensitive data exposure, security misconfiguration
+  - Check for: path traversal, unsafe regex, hardcoded secrets or credentials, missing input validation, unsafe file operations
+  - If any issues found, **fix them directly** in the code
+  - Run the project's test suite or linter on changed files if available, to verify fixes don't break anything
+  - Report: issues found and fixed, or "no security issues found"
+- A **5-minute time budget**
+
+**Code Simplification & Beautification** (skip if `--no-cleanup`):
+
+Spawn 1 agent. Use `model: "sonnet"`.
+
+The agent gets:
+- The output of `git diff main` showing all changes on the feature branch (including any security fixes from above)
+- Instructions to:
+  - Detect and run the project's linter/formatter if one is configured (e.g., prettier, black, rustfmt, gofmt, eslint --fix, phpcs/phpcbf, clang-format)
+  - Remove dead code and unused variables/imports introduced by the fix
+  - Simplify unnecessarily complex conditionals or nested logic
+  - Remove comments that state the obvious
+  - Ensure consistent naming and style with the surrounding code
+  - Do **not** refactor code outside the scope of the bug fix
+  - Report: simplifications applied, formatting fixes, linter results
+- A **5-minute time budget**
+
+#### Commit and create PR
 
 1. Commit the fix on the feature branch with a clear commit message
+2. Push the branch to the remote
+3. Create a PR using `gh pr create` with a title and body that summarise the bug, root cause, and fix approach
 
-Report the branch name to the user. Remind them they can use `/zap-cleanup` to merge and clean up.
+Then proceed to **Phase 7**.
 
 ### 1/3 testers pass → Competitive retry
 
@@ -165,8 +216,52 @@ Spawn **2 new Opus fix agents in parallel**, each in an isolated worktree. Each 
 
 Wait for both to complete. Pick the better revised fix (same criteria as Phase 3). Apply to the feature branch.
 
-Re-run Phase 5 validation. If **2/3 or 3/3 pass**, ship it. If it fails again, stop and report all findings to the user.
+Re-run Phase 5 validation. If **2/3 or 3/3 pass**, follow the "Quality gates & ship" steps above. If it fails again, stop and report all findings to the user.
 
 ### 0/3 testers pass → Stop
 
 The approach is fundamentally wrong. Report all findings, failure reasons, and evidence gathered across all phases. Ask the user for guidance.
+
+## Phase 7: PR Feedback Loop
+
+After the PR is created and pushed, wait for automated review bots (linters, CI checks, code review bots) to post their feedback before reporting to the user.
+
+1. **Wait 5 minutes** for automated review bots to post comments (run `sleep 300`)
+
+2. **Read all PR comments** using both of these commands (replace `{PR_NUMBER}` with the actual PR number, and `{owner}/{repo}` with the repo details from `gh repo view --json nameWithOwner`):
+   ```
+   gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/reviews
+   gh api repos/{owner}/{repo}/pulls/{PR_NUMBER}/comments
+   gh pr view {PR_NUMBER} --comments --json comments
+   ```
+
+3. **For each comment or suggestion**, evaluate whether it is a valid, actionable suggestion:
+   - Read the referenced file and line using the file path and position info in the comment
+   - Assess whether the suggestion would genuinely improve the code (correctness, quality, security, style consistency)
+   - If the suggestion is incorrect, inapplicable, or would make the code worse, mark it as **rejected** and record a brief reason
+   - If the suggestion is valid and beneficial, **implement the fix** directly on the feature branch
+
+4. **Push any fixes** to the same branch with a follow-up commit:
+   ```
+   git add <changed files>
+   git commit -m "address PR review feedback"
+   git push
+   ```
+
+5. **Compile a feedback summary** listing every comment reviewed:
+   - **Accepted**: what was changed and why it was a good suggestion
+   - **Rejected**: what was suggested and why it was declined
+
+If no comments are found after waiting, proceed directly to the final report.
+
+## Final Report
+
+Report to the user:
+
+- **Branch**: the feature branch name
+- **PR**: the PR URL
+- **Fix summary**: root cause identified, approach taken, files changed
+- **Validation**: which testers passed/failed and what they checked
+- **Quality gates**: security issues found/fixed (or skipped), code cleanup applied (or skipped)
+- **PR feedback**: accepted and rejected suggestions (if any)
+- **Next step**: remind the user they can use `/zap-cleanup` to merge and clean up
