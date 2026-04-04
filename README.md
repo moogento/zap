@@ -13,13 +13,13 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 | Phase | What happens | Agents | Model |
 |-------|-------------|--------|-------|
 | **P0 Recon** | Survey codebase, git history, run tests | 3 (or 1) | Sonnet |
-| **P1 Investigate** | 5 different theories tested in parallel | 5 | Sonnet |
-| **P2 Deep dive** | Top 3 theories get full fix implementations | 3 | Opus |
+| **P1 Investigate** | 3 theories tested in parallel; early exit on confirmed | 3 | Sonnet |
+| **P2 Deep dive** | Top 1–2 theories get fix implementations | 1–2 | Opus + Sonnet |
 | **P3 Select** | Orchestrator picks the best fix | — | — |
 | **P4 Apply** | Winner applied to a feature branch | — | — |
-| **P5 Validate** | 3 testers check functional, regression, quality | 3 | Sonnet |
-| **P6 Ship/Retry** | Quality gates (security + cleanup), commit, push, create PR; competitive retry on partial fail | 0–4 | Sonnet/Opus |
-| **P7 PR Feedback** | Wait for review bots, evaluate and fix valid suggestions | — | — |
+| **P5 Validate** | 3 testers check functional, regression, quality | 3 | Haiku |
+| **P6 Ship/Retry** | Quality gates (security + cleanup) in parallel, commit, push, create PR; competitive retry on partial fail | 0–4 | Haiku/Opus |
+| **P7 PR Feedback** | Check for CI, wait if needed, evaluate and fix valid suggestions | — | — |
 
 Every agent runs in an isolated git worktree. No agent can break your working tree.
 
@@ -61,9 +61,11 @@ Examples:
 
 **Parallel recon before theories.** Three specialized agents — code reader, git archaeologist, test runner — survey the codebase simultaneously before anyone starts guessing. Theories are grounded in evidence, not vibes.
 
-**Agents compete, not collaborate.** 5 independent theories, 3 independent fixes. No groupthink. The best fix wins on merit.
+**Agents compete, not collaborate.** Independent theories, independent fixes. No groupthink. The best fix wins on merit.
 
-**Cross-pollination without contamination.** Each phase receives a curated summary of all prior findings. Agents know what was ruled out, not just what was confirmed.
+**Early termination on confirmed root cause.** If an investigation agent confirms the root cause with strong evidence, zap skips the remaining theories and goes straight to implementing the fix — saving agents and tokens.
+
+**Context trimming between phases.** Downstream agents receive focused briefs, not raw dumps. Recon reports are capped, and fix agents get only the evidence relevant to their theory. Less noise, lower token cost.
 
 **Validation is adversarial.** 3 independent testers try to break the fix from different angles. 2 of 3 must pass. No rubber-stamping.
 
@@ -71,7 +73,9 @@ Examples:
 
 **Quality gates before shipping.** After validation passes, a security reviewer scans for OWASP Top 10 vulnerabilities and a cleanup agent runs the project's linter/formatter and simplifies the code — all before the commit lands. Disable with `--no-security` or `--no-cleanup`.
 
-**PR feedback loop.** After the PR is created, zap waits 5 minutes for automated review bots to post comments, then evaluates each suggestion — implementing valid ones and rejecting incorrect ones with reasons.
+**PR feedback loop.** After the PR is created, zap checks for CI/webhooks and waits only if they exist, then evaluates each suggestion — implementing valid ones and rejecting incorrect ones with reasons.
+
+**Code search MCP support.** If a code search MCP is installed (e.g. `code-index-mcp`), recon and investigation agents automatically use it for faster, more targeted code discovery.
 
 ## Install
 
@@ -97,10 +101,11 @@ Then restart Claude Code. `/zap` will be available in all projects.
 
 ## Cost
 
-A full run spawns ~16–21 agents across all phases. Expect roughly:
-- **Typical run:** ~16 agents (3 recon + 5 investigate + 3 fix + 3 test + 2 quality gates) + PR feedback
-- **With retry:** ~21 agents (add 2 fix + 2–3 retest) + PR feedback
-- **Model mix:** Sonnet for investigation/testing, Opus for fix implementation
+A full run spawns ~10–16 agents across all phases. Expect roughly:
+- **Best case (confirmed root cause):** ~10 agents (3 recon + 3 investigate + 1 fix + 3 test) + quality gates + PR feedback
+- **Typical run:** ~12 agents (3 recon + 3 investigate + 2 fix + 3 test + 2 quality gates) + PR feedback
+- **With retry:** ~16 agents (add 2 fix + 2–3 retest) + PR feedback
+- **Model mix:** Sonnet for recon/investigation, Opus for primary fix, Haiku for testing/quality gates
 
 Use it for bugs that justify the investment.
 

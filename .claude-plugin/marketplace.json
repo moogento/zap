@@ -12,7 +12,7 @@
     {
       "name": "zap",
       "description": "Fix bugs using competitive multi-agent investigation with recon, parallel theories, validation, and retry",
-      "version": "1.0.0",
+      "version": "1.1.0",
       "source": "./"
     }
   ]

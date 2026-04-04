@@ -1,6 +1,6 @@
 ---
 name: zap
-description: Fix a bug using competitive multi-agent investigation. 3 parallel recon agents survey the codebase, 5 agents investigate different theories, top 3 implement fixes, validates with 3 testers, retries on partial failure, then commits, creates a PR, waits 5 minutes for automated review feedback, and addresses valid suggestions. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
+description: Fix a bug using competitive multi-agent investigation. 3 recon agents survey the codebase, 3 agents investigate theories (with early termination on confirmed root cause), 1-2 implement fixes, 3 testers validate, retries on partial failure, then commits and creates a PR. Use when a bug is persistent, non-obvious, or has resisted prior fix attempts.
 argument-hint: "<bug description> [--single-recon] [--no-security] [--no-cleanup]"
 ---
 
@@ -21,6 +21,24 @@ Parse `$ARGUMENTS` to extract:
 
 ## Phase 0: Reconnaissance
 
+### Code index detection
+
+Before spawning recon agents, check `.mcp.json` (project root, then `~/.claude/.mcp.json`) for a code search MCP. Look for server entries matching any of these patterns:
+
+| MCP server | Key / command contains | Key search tools |
+|------------|----------------------|------------------|
+| code-index-mcp | `code-index`, `code-index-mcp` | `search_code_advanced`, `get_file_summary`, `find_files` |
+| claude-context | `claude-context` | `search_code`, `search_symbols` |
+| Code-Index-MCP (ViperJuice) | `code-index-mcp`, `viperjuice` | `search`, `lookup_symbol` |
+
+If any code search MCP is detected, include this instruction in **every recon and investigation agent prompt**:
+
+> "A code search MCP is available. Prefer its search tools over grep/glob for finding relevant code — they return more targeted results with less noise. Fall back to grep/glob for simple exact-string matches or if the MCP tools don't return useful results."
+
+If no code search MCP is detected, proceed normally (agents use grep/glob). After Phase 0 completes, include a one-line note in the final report: **"Tip: Install a code search MCP (e.g. `code-index-mcp`) for faster, more accurate recon."**
+
+---
+
 If `$ARGUMENTS` contains `--single-recon`, use **single-agent recon** (below). Otherwise, use **parallel recon** (default).
 
 ### Default: Parallel recon (3 agents, fast)
@@ -35,8 +53,9 @@ Each agent has a distinct recon responsibility:
   - Find and read source files likely related to the bug
   - Map the relevant code paths, entry points, and data flow
   - Identify suspicious patterns, error handling gaps, or logic issues
-  - Return a **structured report**: relevant files (with brief descriptions), code path analysis, suspicious areas
-- A **5-minute time budget** — breadth over depth
+  - Return a **structured report**: relevant files (paths + line ranges + one-line descriptions), code path analysis, suspicious areas
+  - **Keep the report under 300 lines. Return file paths and line ranges, NOT full file contents. Downstream agents can read files themselves.**
+- A **3-minute time budget** — breadth over depth
 
 **Agent 2 — Git archaeologist:**
 - The bug description
@@ -45,8 +64,9 @@ Each agent has a distinct recon responsibility:
   - Run `git blame` on the most suspect sections
   - Identify recent changes that could have introduced the bug
   - Check commit messages and PR descriptions for related context
-  - Return a **structured report**: recent changes (commits, authors, dates, diffs), suspect commits, relevant history
-- A **5-minute time budget** — breadth over depth
+  - Return a **structured report**: recent changes (commit hashes, authors, dates, one-line summaries), suspect commits, relevant history
+  - **Keep the report under 300 lines. Summarize diffs — do not paste full diffs. Include commit hashes so downstream agents can inspect if needed.**
+- A **3-minute time budget** — breadth over depth
 
 **Agent 3 — Test runner:**
 - The bug description
@@ -55,8 +75,9 @@ Each agent has a distinct recon responsibility:
   - Note which tests pass and which fail, with output
   - Search for related TODOs, FIXMEs, HACKs, or known-issue comments
   - Check for disabled/skipped tests that might be relevant
-  - Return a **structured report**: test results (pass/fail with output), related comments and TODOs, test coverage gaps
-- A **5-minute time budget** — breadth over depth
+  - Return a **structured report**: test results (pass/fail with brief output), related comments and TODOs, test coverage gaps
+  - **Keep the report under 300 lines. For failing tests, include the assertion/error message only, not full stack traces. For passing tests, just list them.**
+- A **3-minute time budget** — breadth over depth
 
 Wait for all 3 agents to complete. Merge their reports into a single **recon report**: combine relevant files, recent changes, test results, and initial observations. Deduplicate and cross-reference findings. This becomes the shared artifact that every agent in every subsequent phase receives as baseline context.
 
@@ -71,16 +92,17 @@ This agent does a fast survey of the codebase related to the bug. Its prompt mus
   - Run `git log` on suspect files/directories to find recent changes
   - Run existing tests if available, note which pass/fail
   - Check for related issues in comments, TODOs, or commit messages
-  - Return a **structured report**: relevant files (with brief descriptions), recent changes (commits, authors, dates), test results, initial observations
-- A **5-minute time budget** — breadth over depth
+  - Return a **structured report**: relevant files (paths + line ranges + one-line descriptions), recent changes (commit hashes, dates, one-line summaries), test results, initial observations
+  - **Keep the report under 400 lines. Return file paths and line ranges, NOT full file contents. Summarize diffs. Downstream agents can read files themselves.**
+- A **3-minute time budget** — breadth over depth
 
 Wait for the agent to complete. Save its report — this becomes the **recon report**, a shared artifact that every agent in every subsequent phase receives as baseline context.
 
-## Phase 1: Investigate (5 agents, fast)
+## Phase 1: Investigate (3 agents, fast)
 
-Read the recon report. Generate **5 distinct theories** about the root cause, grounded in the recon findings. Theories should cover different layers of the stack (e.g., data flow, timing/async, state management, rendering/UI, configuration). One theory must always be a **git history theory**: "The bug was introduced by a recent change — identify which commit and why." Avoid overlapping theories.
+Read the recon report. Generate **3 distinct theories** about the root cause, grounded in the recon findings. Theories should cover different layers of the stack (e.g., data flow, timing/async, state management, configuration). One theory must always be a **git history theory**: "The bug was introduced by a recent change — identify which commit and why." Avoid overlapping theories.
 
-Spawn **5 agents in parallel**, each in an isolated worktree. Use `model: "sonnet"`.
+Spawn **3 agents in parallel**, each in an isolated worktree. Use `model: "sonnet"`.
 
 Each agent's prompt must include:
 - The bug description
@@ -89,19 +111,27 @@ Each agent's prompt must include:
 - Instructions to: read relevant code, **run builds/tests/commands as needed** to confirm or deny the theory, add temporary diagnostic logging if it helps, write a brief verdict (LIKELY / UNLIKELY / CONFIRMED) with evidence (file paths, line numbers, command output, git commits)
 - A **5-minute time budget** — focused investigation, not exhaustive
 
-Wait for all 5 to complete. Synthesize all 5 reports into a **curated summary**: what was confirmed, what was ruled out, key evidence, files involved. Display a summary table:
+Wait for all 3 to complete. Synthesize all 3 reports into a **curated summary**: what was confirmed, what was ruled out, key evidence, files involved. Display a summary table:
 
 ```
 | Agent | Theory | Verdict | Key Evidence |
 ```
 
-## Phase 2: Deep dive (top 3, medium effort)
+### Early termination
 
-Select the **top 3** theories (CONFIRMED > LIKELY > UNLIKELY, break ties by evidence quality).
+If any investigation agent returns **CONFIRMED** with strong evidence (specific file, line, and reproduction), skip directly to Phase 2 with **only 1 agent** for the confirmed theory. Do not spawn agents for unconfirmed theories — the evidence is sufficient.
 
-Spawn **3 agents in parallel**, each in an isolated worktree. Use `model: "opus"` — these agents need strong reasoning to identify root causes and write correct fixes. Each agent gets:
+## Phase 2: Deep dive (top theories, medium effort)
+
+**If early termination triggered (1 CONFIRMED theory):** Spawn **1 agent** in an isolated worktree. Use `model: "opus"`.
+
+**Otherwise:** Select the **top 2** theories (CONFIRMED > LIKELY > UNLIKELY, break ties by evidence quality). Spawn **2 agents in parallel**, each in an isolated worktree. Use `model: "opus"` for the strongest theory and `model: "sonnet"` for the second.
+
+**Context trimming:** Before writing P2 prompts, distill the recon report + P1 findings into a **focused brief** for each agent. Include only: the bug description, the relevant theory with its key evidence (files, lines, commits), and a list of files to read. Do NOT forward the full recon report or full P1 reports — agents can read files themselves.
+
+Each agent gets:
 - The bug description
-- The **orchestrator's curated summary** of all Phase 1 findings (not just their own theory)
+- The **orchestrator's focused brief**: trimmed findings relevant to this agent's theory (not the full recon report or all P1 reports)
 - Its confirmed/likely theory as primary focus
 - Instructions to:
   - Implement a fix
@@ -110,7 +140,7 @@ Spawn **3 agents in parallel**, each in an isolated worktree. Use `model: "opus"
   - Report: files changed, approach summary, whether a test was written, what validation was run and results
 - A **10-minute time budget** — implement the fix, don't over-engineer
 
-Wait for all 3 to complete. For each, note:
+Wait for all fix agents to complete. For each, note:
 - What validation did it run, and did it pass?
 - What files were changed?
 - Was a regression test written?
@@ -119,13 +149,15 @@ Wait for all 3 to complete. For each, note:
 
 ## Phase 3: Select winner
 
-Evaluate the 3 fixes as orchestrator. Pick the **winner** based on:
+**If only 1 fix agent was spawned (early termination):** Skip selection — use that fix directly.
+
+**If 2 fix agents were spawned:** Evaluate both fixes as orchestrator. Pick the **winner** based on:
 1. Correctness — does it actually address the root cause?
 2. Minimality — fewest lines changed, least risk of side effects
 3. Completeness — handles edge cases the others miss
 4. Validation confidence — an agent that ran a full test suite gets more trust than one that only checked syntax
 
-If multiple fixes address different aspects of the same bug (compounding issues), **combine them** into a single fix. Otherwise, take the single best fix.
+If both fixes address different aspects of the same bug (compounding issues), **combine them** into a single fix. Otherwise, take the single best fix.
 
 If no fix is satisfactory, explain why and ask the user for guidance.
 
@@ -139,12 +171,11 @@ Run available validation on the feature branch (build, tests, linter — whateve
 
 ## Phase 5: Validate (3 testers, 2/3 must pass)
 
-Spawn **3 testing agents in parallel**, each in an isolated worktree based on the feature branch. Use `model: "sonnet"`.
+Spawn **3 testing agents in parallel**, each in an isolated worktree based on the feature branch. Use `model: "haiku"`.
 
 Each tester gets:
-- The bug description
-- The orchestrator's curated summary of findings
-- The fix that was applied (summary of changes)
+- The bug description (1-2 sentences)
+- A **brief fix summary**: what was changed, which files, and the approach (not the full investigation history)
 - Whether a regression test was written in Phase 2
 - A different validation angle:
   - **Tester 1: Functional** — Does the fix resolve the reported bug? Trace the code path. Run available validation. If a regression test was written, verify it fails on main and passes on the fix branch.
@@ -163,11 +194,11 @@ Run quality gates on the feature branch before committing, then ship.
 
 #### Quality gates
 
-Run these **sequentially** on the feature branch (both modify files, so no parallel execution). Each agent works directly on the feature branch — no worktree isolation needed.
+Run these **in parallel** on the feature branch. Each agent works in an isolated worktree based on the feature branch. After both complete, apply any changes from both agents to the feature branch (cherry-pick or manually merge — resolve conflicts if any).
 
 **Security Review & Fix** (skip if `--no-security`):
 
-Spawn 1 agent. Use `model: "sonnet"`.
+Spawn 1 agent in an isolated worktree. Use `model: "haiku"`.
 
 The agent gets:
 - The bug description
@@ -183,10 +214,10 @@ The agent gets:
 
 **Code Simplification & Beautification** (skip if `--no-cleanup`):
 
-Spawn 1 agent. Use `model: "sonnet"`.
+Spawn 1 agent in an isolated worktree. Use `model: "haiku"`.
 
 The agent gets:
-- The output of `git diff main` showing all changes on the feature branch (including any security fixes from above)
+- The output of `git diff main` showing all changes on the feature branch
 - Instructions to:
   - Detect and run the project's linter/formatter if one is configured (e.g., prettier, black, rustfmt, gofmt, eslint --fix, phpcs/phpcbf, clang-format)
   - Remove dead code and unused variables/imports introduced by the fix
@@ -226,7 +257,7 @@ The approach is fundamentally wrong. Report all findings, failure reasons, and e
 
 After the PR is created and pushed, wait for automated review bots (linters, CI checks, code review bots) to post their feedback before reporting to the user.
 
-1. **Wait 5 minutes** for automated review bots to post comments (run `sleep 300`)
+1. **Check for CI/review bots**: Run `ls .github/workflows/ 2>/dev/null` and `gh api repos/{owner}/{repo}/hooks --jq length 2>/dev/null` to detect if the repo has CI workflows or webhooks configured. If **neither exists**, skip the wait and go directly to step 2. Otherwise, **wait 3 minutes** for automated review bots to post comments (run `sleep 180`).
 
 2. **Read all PR comments** using both of these commands (replace `{PR_NUMBER}` with the actual PR number, and `{owner}/{repo}` with the repo details from `gh repo view --json nameWithOwner`):
    ```
