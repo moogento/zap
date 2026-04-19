@@ -79,8 +79,9 @@ Examples:
 
 ## Install
 
-```bash
-claude plugins add github:moogento/zap
+```
+/plugin marketplace add https://github.com/moogento/zap.git
+/plugin install zap@zap
 ```
 
 Then restart Claude Code. `/zap` will be available in all projects.
