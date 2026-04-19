@@ -2,7 +2,7 @@
 
 # zap
 
-A Claude Code plugin that fixes bugs using competitive multi-agent investigation. When a bug resists your first few attempts, zap throws a squad of agents at it — recon, parallel theories, competing fixes, independent validation — and commits a fix.
+A Claude Code plugin that fixes bugs using competitive multi-agent investigation. When a bug resists your first few attempts, zap throws a squad of agents at it - recon, parallel theories, competing fixes, independent validation - and commits a fix.
 
 ## How It Works
 
@@ -15,11 +15,11 @@ A Claude Code plugin that fixes bugs using competitive multi-agent investigation
 | **P0 Recon** | Survey codebase, git history, run tests | 3 (or 1) | Sonnet |
 | **P1 Investigate** | 3 theories tested in parallel; early exit on confirmed | 3 | Sonnet |
 | **P2 Deep dive** | Top 1–2 theories get fix implementations | 1–2 | Opus + Sonnet |
-| **P3 Select** | Orchestrator picks the best fix | — | — |
-| **P4 Apply** | Winner applied to a feature branch | — | — |
+| **P3 Select** | Orchestrator picks the best fix | - | - |
+| **P4 Apply** | Winner applied to a feature branch | - | - |
 | **P5 Validate** | 3 testers check functional, regression, quality | 3 | Haiku |
 | **P6 Ship/Retry** | Quality gates (security + cleanup) in parallel, commit, push, create PR; competitive retry on partial fail | 0–4 | Haiku/Opus |
-| **P7 PR Feedback** | Check for CI, wait if needed, evaluate and fix valid suggestions | — | — |
+| **P7 PR Feedback** | Check for CI, wait if needed, evaluate and fix valid suggestions | - | - |
 
 Every agent runs in an isolated git worktree. No agent can break your working tree.
 
@@ -50,7 +50,7 @@ Examples:
 ```
 /zap thumbnails don't update after importing a 3D model
 
-/zap race condition in WebSocket reconnect — messages dropped on fast network switches
+/zap race condition in WebSocket reconnect - messages dropped on fast network switches
 
 /zap build fails on CI but passes locally, something about asset paths
 
@@ -59,11 +59,11 @@ Examples:
 
 ## What Makes It Different
 
-**Parallel recon before theories.** Three specialized agents — code reader, git archaeologist, test runner — survey the codebase simultaneously before anyone starts guessing. Theories are grounded in evidence, not vibes.
+**Parallel recon before theories.** Three specialized agents - code reader, git archaeologist, test runner - survey the codebase simultaneously before anyone starts guessing. Theories are grounded in evidence, not vibes.
 
 **Agents compete, not collaborate.** Independent theories, independent fixes. No groupthink. The best fix wins on merit.
 
-**Early termination on confirmed root cause.** If an investigation agent confirms the root cause with strong evidence, zap skips the remaining theories and goes straight to implementing the fix — saving agents and tokens.
+**Early termination on confirmed root cause.** If an investigation agent confirms the root cause with strong evidence, zap skips the remaining theories and goes straight to implementing the fix - saving agents and tokens.
 
 **Context trimming between phases.** Downstream agents receive focused briefs, not raw dumps. Recon reports are capped, and fix agents get only the evidence relevant to their theory. Less noise, lower token cost.
 
@@ -71,9 +71,9 @@ Examples:
 
 **Retry is competitive.** If validation partially fails, 2 new agents compete to revise the fix using failure feedback. One more shot before giving up.
 
-**Quality gates before shipping.** After validation passes, a security reviewer scans for OWASP Top 10 vulnerabilities and a cleanup agent runs the project's linter/formatter and simplifies the code — all before the commit lands. Disable with `--no-security` or `--no-cleanup`.
+**Quality gates before shipping.** After validation passes, a security reviewer scans for OWASP Top 10 vulnerabilities and a cleanup agent runs the project's linter/formatter and simplifies the code - all before the commit lands. Disable with `--no-security` or `--no-cleanup`.
 
-**PR feedback loop.** After the PR is created, zap checks for CI/webhooks and waits only if they exist, then evaluates each suggestion — implementing valid ones and rejecting incorrect ones with reasons.
+**PR feedback loop.** After the PR is created, zap checks for CI/webhooks and waits only if they exist, then evaluates each suggestion - implementing valid ones and rejecting incorrect ones with reasons.
 
 **Code search MCP support.** If a code search MCP is installed (e.g. `code-index-mcp`), recon and investigation agents automatically use it for faster, more targeted code discovery.
 
@@ -113,7 +113,7 @@ Use it for bugs that justify the investment.
 
 - Claude Code CLI
 - Git repository (worktrees require it)
-- That's it — no dependencies, no config, no build step
+- That's it - no dependencies, no config, no build step
 
 ## License
 
