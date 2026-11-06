@@ -43,7 +43,7 @@ If `$ARGUMENTS` contains `--single-recon`, use **single-agent recon** (below). O
 
 ### Default: Parallel recon (3 agents, fast)
 
-Spawn **3 agents in parallel**, each in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`.
+Spawn **3 agents in parallel**, each in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`, `effort: "medium"`.
 
 Each agent has a distinct recon responsibility:
 
@@ -83,7 +83,7 @@ Wait for all 3 agents to complete. Merge their reports into a single **recon rep
 
 ### Alternative: Single-agent recon (`--single-recon`)
 
-Spawn **1 agent** in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`.
+Spawn **1 agent** in an isolated worktree (`isolation: "worktree"`). Use `model: "sonnet"`, `effort: "medium"`.
 
 This agent does a fast survey of the codebase related to the bug. Its prompt must include:
 - The bug description
@@ -102,7 +102,7 @@ Wait for the agent to complete. Save its report — this becomes the **recon rep
 
 Read the recon report. Generate **3 distinct theories** about the root cause, grounded in the recon findings. Theories should cover different layers of the stack (e.g., data flow, timing/async, state management, configuration). One theory must always be a **git history theory**: "The bug was introduced by a recent change — identify which commit and why." Avoid overlapping theories.
 
-Spawn **3 agents in parallel**, each in an isolated worktree. Use `model: "sonnet"`.
+Spawn **3 agents in parallel**, each in an isolated worktree. Use `model: "sonnet"`, `effort: "medium"`.
 
 Each agent's prompt must include:
 - The bug description
@@ -123,9 +123,9 @@ If any investigation agent returns **CONFIRMED** with strong evidence (specific 
 
 ## Phase 2: Deep dive (top theories, medium effort)
 
-**If early termination triggered (1 CONFIRMED theory):** Spawn **1 agent** in an isolated worktree. Use `model: "opus"`.
+**If early termination triggered (1 CONFIRMED theory):** Spawn **1 agent** in an isolated worktree. Use `model: "opus"`, `effort: "medium"`.
 
-**Otherwise:** Select the **top 2** theories (CONFIRMED > LIKELY > UNLIKELY, break ties by evidence quality). Spawn **2 agents in parallel**, each in an isolated worktree. Use `model: "opus"` for the strongest theory and `model: "sonnet"` for the second.
+**Otherwise:** Select the **top 2** theories (CONFIRMED > LIKELY > UNLIKELY, break ties by evidence quality). Spawn **2 agents in parallel**, each in an isolated worktree. Use `model: "opus"` for the strongest theory and `model: "sonnet"` for the second, both with `effort: "medium"`.
 
 **Context trimming:** Before writing P2 prompts, distill the recon report + P1 findings into a **focused brief** for each agent. Include only: the bug description, the relevant theory with its key evidence (files, lines, commits), and a list of files to read. Do NOT forward the full recon report or full P1 reports — agents can read files themselves.
 
@@ -171,7 +171,7 @@ Run available validation on the feature branch (build, tests, linter — whateve
 
 ## Phase 5: Validate (3 testers, 2/3 must pass)
 
-Spawn **3 testing agents in parallel**, each in an isolated worktree based on the feature branch. Use `model: "haiku"`.
+Spawn **3 testing agents in parallel**, each in an isolated worktree based on the feature branch. Use `model: "haiku"`, `effort: "high"`.
 
 Each tester gets:
 - The bug description (1-2 sentences)
@@ -198,7 +198,7 @@ Run these **in parallel** on the feature branch. Each agent works in an isolated
 
 **Security Review & Fix** (skip if `--no-security`):
 
-Spawn 1 agent in an isolated worktree. Use `model: "haiku"`.
+Spawn 1 agent in an isolated worktree. Use `model: "haiku"`, `effort: "high"`.
 
 The agent gets:
 - The bug description
@@ -214,7 +214,7 @@ The agent gets:
 
 **Code Simplification & Beautification** (skip if `--no-cleanup`):
 
-Spawn 1 agent in an isolated worktree. Use `model: "haiku"`.
+Spawn 1 agent in an isolated worktree. Use `model: "haiku"`, `effort: "high"`.
 
 The agent gets:
 - The output of `git diff main` showing all changes on the feature branch

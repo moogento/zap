@@ -3,6 +3,7 @@ description: Merge a zap fix branch to main and clean up worktrees and branches
 argument-hint: [branch-name]
 allowed-tools: Bash(git:*), Read
 model: haiku
+effort: high
 ---
 
 # Zap Cleanup
